@@ -32,7 +32,8 @@
             android:name=".ui.auth.RegisterActivity"
             android:exported="false"
             android:theme="@style/Theme.AppBanMyPham" />
-        <activity android:name=".ui.admin.DashboardActivity"/>
+        <activity android:name=".ui.admin.DashboardActivity"
+            android:screenOrientation="portrait" />
         <activity android:name=".ui.product.ProductActivity"/>
         <activity android:name=".ui.admin.ManageProductActivity" />
         <activity android:name=".ui.admin.ManageBrandActivity" />
@@ -41,6 +42,15 @@
             android:name=".ui.product.ProductDetailsActivity"
             android:exported="false"
             android:parentActivityName=".ui.product.ProductActivity" />
+        <activity android:name=".ui.checkout.CheckoutActivity"
+            android:windowSoftInputMode="adjustResize"/>
+        <activity android:name=".ui.admin.ManageOrderActivity" />
+        <activity
+            android:name=".ui.admin.ManageReviewActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+
     </application>
 
 </manifest>

@@ -245,7 +245,7 @@ fun ManageProductScreen(onBack: () -> Unit = {}) {
                                     db.collection("products").document(it.id).delete()
                                     // Xoá Room
                                     withContext(Dispatchers.IO) {
-                                        AppDatabase.getDatabase(context).productDao().deleteById(it.id)
+                                        AppDatabase.getInstance(context).productDao().deleteById(it.id)
                                     }
                                 }
                             }
@@ -692,7 +692,7 @@ private suspend fun saveProduct(
         data["createdAt"] = System.currentTimeMillis()
         val docRef = db.collection("products").add(data).await()
         withContext(Dispatchers.IO) {
-            AppDatabase.getDatabase(context).productDao().insert(
+            AppDatabase.getInstance(context).productDao().insert(
                 Product(
                     id          = docRef.id,
                     name        = item.name,
@@ -709,7 +709,7 @@ private suspend fun saveProduct(
     } else {
         db.collection("products").document(item.id).update(data as Map<String, Any>).await()
         withContext(Dispatchers.IO) {
-            AppDatabase.getDatabase(context).productDao().update(
+            AppDatabase.getInstance(context).productDao().update(
                 Product(
                     id          = item.id,
                     name        = item.name,

@@ -9,9 +9,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
@@ -44,6 +46,12 @@ class LoginActivity : ComponentActivity() {
                     LoginScreen(
                         onGoRegister = {
                             startActivity(Intent(this, RegisterActivity::class.java))
+                        },
+                        onGoHome = {
+                            val intent = Intent(this, ProductActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                            }
+                            startActivity(intent)
                         }
                     )
                 }
@@ -54,11 +62,12 @@ class LoginActivity : ComponentActivity() {
 
 @Composable
 fun LoginScreen(
-    onGoRegister: () -> Unit = {}
+    onGoRegister : () -> Unit = {},
+    onGoHome     : () -> Unit = {}
 ) {
     val context = LocalContext.current
-    val auth = remember { FirebaseAuth.getInstance() }
-    val db   = remember { FirebaseFirestore.getInstance() }
+    val auth    = remember { FirebaseAuth.getInstance() }
+    val db      = remember { FirebaseFirestore.getInstance() }
 
     var email     by remember { mutableStateOf("") }
     var password  by remember { mutableStateOf("") }
@@ -72,20 +81,18 @@ fun LoginScreen(
             return
         }
         isLoading = true
-        errorMsg = ""
+        errorMsg  = ""
         auth.signInWithEmailAndPassword(email.trim(), password)
             .addOnSuccessListener { result ->
                 val uid = result.user?.uid ?: run {
                     isLoading = false
-                    errorMsg = "Không lấy được uid"
+                    errorMsg  = "Không lấy được uid"
                     return@addOnSuccessListener
                 }
-
-                // Đọc role từ Firestore
                 db.collection("users").document(uid).get()
                     .addOnSuccessListener { doc ->
                         isLoading = false
-                        val role = doc.getLong("role")?.toInt() ?: 0
+                        val role   = doc.getLong("role")?.toInt() ?: 0
                         val intent = if (role == 1) {
                             Intent(context, DashboardActivity::class.java)
                         } else {
@@ -96,17 +103,17 @@ fun LoginScreen(
                     }
                     .addOnFailureListener { e ->
                         isLoading = false
-                        errorMsg = "Lỗi đọc dữ liệu: ${e.message}"
+                        errorMsg  = "Lỗi đọc dữ liệu: ${e.message}"
                     }
             }
             .addOnFailureListener { e ->
                 isLoading = false
-                errorMsg = when {
-                    e.message?.contains("no user record") == true      -> "Tài khoản không tồn tại"
+                errorMsg  = when {
+                    e.message?.contains("no user record")    == true -> "Tài khoản không tồn tại"
                     e.message?.contains("password is invalid") == true -> "Mật khẩu không đúng"
-                    e.message?.contains("badly formatted") == true     -> "Email không hợp lệ"
-                    e.message?.contains("network error") == true       -> "Lỗi kết nối mạng"
-                    else                                                -> "Đăng nhập thất bại"
+                    e.message?.contains("badly formatted")   == true -> "Email không hợp lệ"
+                    e.message?.contains("network error")     == true -> "Lỗi kết nối mạng"
+                    else -> "Đăng nhập thất bại"
                 }
             }
     }
@@ -117,15 +124,39 @@ fun LoginScreen(
             .background(BackgroundPrimary)
             .verticalScroll(rememberScrollState())
     ) {
-        // ── Hero Section ──
+        // ── Hero Section ──────────────────────────────────────────────────────
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(240.dp)
                 .background(brush = AppGradients.mintHorizontal)
-                .padding(horizontal = 28.dp, vertical = 28.dp)
+                .padding(horizontal = 20.dp, vertical = 20.dp)
         ) {
-            Column(modifier = Modifier.align(Alignment.BottomStart)) {
+            // Nút Home — góc trên phải
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.25f))
+                    .clickable { onGoHome() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    Icons.Default.Home,
+                    contentDescription = "Về trang chủ",
+                    tint     = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Text hero — góc dưới trái
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(horizontal = 8.dp, vertical = 8.dp)
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
@@ -138,37 +169,37 @@ fun LoginScreen(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "LUMIÈRE",
-                        color = Color.White,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.SemiBold,
+                        "LUMIÈRE",
+                        color         = Color.White,
+                        fontSize      = 15.sp,
+                        fontWeight    = FontWeight.SemiBold,
                         letterSpacing = 2.sp
                     )
                 }
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
-                    text = "Chào mừng",
-                    color = Color.White,
-                    fontSize = 26.sp,
+                    "Chào mừng",
+                    color      = Color.White,
+                    fontSize   = 26.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "trở lại!",
-                    color = Color.White.copy(alpha = 0.75f),
-                    fontSize = 26.sp,
+                    "trở lại!",
+                    color      = Color.White.copy(alpha = 0.75f),
+                    fontSize   = 26.sp,
                     fontWeight = FontWeight.Bold,
-                    fontStyle = FontStyle.Italic
+                    fontStyle  = FontStyle.Italic
                 )
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Đăng nhập để khám phá bộ sưu tập mới nhất",
-                    color = Color.White.copy(alpha = 0.82f),
+                    "Đăng nhập để khám phá bộ sưu tập mới nhất",
+                    color    = Color.White.copy(alpha = 0.82f),
                     fontSize = 13.sp
                 )
             }
         }
 
-        // ── Form Card ──
+        // ── Form Card ─────────────────────────────────────────────────────────
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -178,10 +209,10 @@ fun LoginScreen(
                 .padding(horizontal = 28.dp, vertical = 28.dp)
         ) {
             Text(
-                text = "ĐĂNG NHẬP TÀI KHOẢN",
-                color = MintGreen,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
+                "ĐĂNG NHẬP TÀI KHOẢN",
+                color         = MintGreen,
+                fontSize      = 11.sp,
+                fontWeight    = FontWeight.Medium,
                 letterSpacing = 2.sp
             )
 
@@ -189,32 +220,31 @@ fun LoginScreen(
 
             LoginFieldLabel("Email")
             OutlinedTextField(
-                value = email,
+                value         = email,
                 onValueChange = { email = it; errorMsg = "" },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("yourname@email.com", color = Color(0xFFAAD8CE)) },
-                shape = RoundedCornerShape(14.dp),
-                singleLine = true,
-                colors = loginTextFieldColors()
+                modifier      = Modifier.fillMaxWidth(),
+                placeholder   = { Text("yourname@email.com", color = Color(0xFFAAD8CE)) },
+                shape         = RoundedCornerShape(14.dp),
+                singleLine    = true,
+                colors        = loginTextFieldColors()
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             LoginFieldLabel("Mật khẩu")
             OutlinedTextField(
-                value = password,
+                value         = password,
                 onValueChange = { password = it; errorMsg = "" },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Mật khẩu", color = Color(0xFFAAD8CE)) },
-                shape = RoundedCornerShape(14.dp),
-                singleLine = true,
+                modifier      = Modifier.fillMaxWidth(),
+                placeholder   = { Text("Mật khẩu", color = Color(0xFFAAD8CE)) },
+                shape         = RoundedCornerShape(14.dp),
+                singleLine    = true,
                 visualTransformation = if (showPass) VisualTransformation.None
                 else PasswordVisualTransformation(),
-                trailingIcon = {
+                trailingIcon  = {
                     IconButton(onClick = { showPass = !showPass }) {
                         Icon(
-                            imageVector = if (showPass) Icons.Default.Visibility
-                            else Icons.Default.VisibilityOff,
+                            if (showPass) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                             contentDescription = null,
                             tint = Color(0xFFAAD8CE)
                         )
@@ -226,11 +256,11 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             Text(
-                text = "Quên mật khẩu?",
-                fontSize = 12.sp,
-                color = MintGreen,
+                "Quên mật khẩu?",
+                fontSize   = 12.sp,
+                color      = MintGreen,
                 fontWeight = FontWeight.Medium,
-                modifier = Modifier
+                modifier   = Modifier
                     .align(Alignment.End)
                     .clickable { }
             )
@@ -239,8 +269,8 @@ fun LoginScreen(
 
             if (errorMsg.isNotEmpty()) {
                 Text(
-                    text = errorMsg,
-                    color = Color(0xFFF09595),
+                    errorMsg,
+                    color    = Color(0xFFF09595),
                     fontSize = 13.sp,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
@@ -258,17 +288,46 @@ fun LoginScreen(
             ) {
                 if (isLoading) {
                     CircularProgressIndicator(
-                        color = Color.White,
-                        modifier = Modifier.size(24.dp),
+                        color       = Color.White,
+                        modifier    = Modifier.size(24.dp),
                         strokeWidth = 2.dp
                     )
                 } else {
                     Text(
-                        text = "Đăng nhập",
-                        color = Color.White,
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
+                        "Đăng nhập",
+                        color         = Color.White,
+                        fontSize      = 15.sp,
+                        fontWeight    = FontWeight.Medium,
                         letterSpacing = 0.5.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Nút về trang chủ (không cần đăng nhập)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(50.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFEAF9F5))
+                    .clickable { onGoHome() },
+                contentAlignment = Alignment.Center
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.Home,
+                        contentDescription = null,
+                        tint     = MintGreen,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Tiếp tục không đăng nhập",
+                        color      = MintGreen,
+                        fontSize   = 14.sp,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
@@ -276,16 +335,16 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier              = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.Center
             ) {
                 Text("Chưa có tài khoản? ", fontSize = 12.sp, color = Color(0xFF8ACABA))
                 Text(
-                    text = "Đăng ký ngay",
-                    fontSize = 12.sp,
-                    color = MintGreen,
+                    "Đăng ký ngay",
+                    fontSize   = 12.sp,
+                    color      = MintGreen,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier.clickable { onGoRegister() }
+                    modifier   = Modifier.clickable { onGoRegister() }
                 )
             }
         }
@@ -295,11 +354,11 @@ fun LoginScreen(
 @Composable
 private fun LoginFieldLabel(text: String) {
     Text(
-        text = text,
-        color = MintGreen,
-        fontSize = 11.sp,
+        text       = text,
+        color      = MintGreen,
+        fontSize   = 11.sp,
         fontWeight = FontWeight.Medium,
-        modifier = Modifier.padding(bottom = 6.dp)
+        modifier   = Modifier.padding(bottom = 6.dp)
     )
 }
 

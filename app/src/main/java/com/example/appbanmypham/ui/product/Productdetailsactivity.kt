@@ -31,6 +31,7 @@ import coil.compose.AsyncImage
 import com.example.appbanmypham.model.Product
 import com.example.appbanmypham.ui.auth.LoginActivity
 import com.example.appbanmypham.ui.cart.CartActivity
+import com.example.appbanmypham.ui.review.ProductReviewSection   // ← THÊM
 import com.example.appbanmypham.ui.theme.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -91,7 +92,6 @@ fun ProductDetailsScreen(
     var showLoginSnack  by remember { mutableStateOf(false) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Load chi tiết sản phẩm
     LaunchedEffect(productId) {
         db.collection("products").document(productId).get()
             .addOnSuccessListener { doc ->
@@ -113,18 +113,16 @@ fun ProductDetailsScreen(
             .addOnFailureListener { isLoading = false }
     }
 
-    // Load sản phẩm cùng thương hiệu
     LaunchedEffect(product?.brandId) {
         val brandId = product?.brandId ?: return@LaunchedEffect
         if (brandId.isBlank()) return@LaunchedEffect
-
         db.collection("products")
             .whereEqualTo("brandId", brandId)
             .get()
             .addOnSuccessListener { snap ->
                 val now = System.currentTimeMillis()
                 relatedProducts = snap.documents
-                    .filter { it.id != productId }           // loại chính nó ra
+                    .filter { it.id != productId }
                     .map { doc ->
                         Product(
                             id          = doc.id,
@@ -142,14 +140,12 @@ fun ProductDetailsScreen(
             }
     }
 
-    // Cart count realtime
     LaunchedEffect(currentUser?.uid) {
         val uid = currentUser?.uid ?: run { cartCount = 0; return@LaunchedEffect }
         db.collection("carts").document(uid).collection("items")
             .addSnapshotListener { snap, _ -> cartCount = snap?.size() ?: 0 }
     }
 
-    // Snackbar feedback
     LaunchedEffect(addedToCart) {
         if (addedToCart) {
             snackbarHostState.showSnackbar("Đã thêm vào giỏ hàng ✓")
@@ -164,7 +160,7 @@ fun ProductDetailsScreen(
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost   = { SnackbarHost(snackbarHostState) },
         containerColor = BackgroundPrimary,
         topBar = {
             Box(
@@ -185,7 +181,6 @@ fun ProductDetailsScreen(
                     fontWeight    = FontWeight.SemiBold,
                     letterSpacing = 0.3.sp
                 )
-                // Cart icon
                 Box(modifier = Modifier.align(Alignment.CenterEnd)) {
                     IconButton(onClick = { if (isLoggedIn) onGoCart() else onGoLogin() }) {
                         Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.White)
@@ -210,7 +205,6 @@ fun ProductDetailsScreen(
             }
         },
         bottomBar = {
-            // Bottom bar: nút thêm vào giỏ hàng
             product?.let { p ->
                 Surface(shadowElevation = 8.dp, color = Color.White) {
                     Row(
@@ -235,11 +229,11 @@ fun ProductDetailsScreen(
                                 addToCart(db, auth, p)
                                 addedToCart = true
                             },
-                            enabled = p.stock > 0,
+                            enabled  = p.stock > 0,
                             modifier = Modifier.height(50.dp).weight(1.5f),
-                            shape  = RoundedCornerShape(14.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MintGreen,
+                            shape    = RoundedCornerShape(14.dp),
+                            colors   = ButtonDefaults.buttonColors(
+                                containerColor         = MintGreen,
                                 disabledContainerColor = Color(0xFFCCCCCC)
                             )
                         ) {
@@ -270,7 +264,7 @@ fun ProductDetailsScreen(
                 }
             }
             else -> {
-                val p = product!!
+                val p            = product!!
                 val isNew        = (System.currentTimeMillis() - p.createdAt) < 7 * 24 * 60 * 60 * 1000L
                 val isOutOfStock = p.stock == 0
 
@@ -290,16 +284,15 @@ fun ProductDetailsScreen(
                     ) {
                         if (p.imageUrl.isNotEmpty()) {
                             AsyncImage(
-                                model = p.imageUrl,
+                                model              = p.imageUrl,
                                 contentDescription = p.name,
-                                contentScale = ContentScale.Fit,
-                                modifier = Modifier.fillMaxSize().padding(16.dp),
-                                alpha = if (isOutOfStock) 0.5f else 1f
+                                contentScale       = ContentScale.Fit,
+                                modifier           = Modifier.fillMaxSize().padding(16.dp),
+                                alpha              = if (isOutOfStock) 0.5f else 1f
                             )
                         } else {
                             Text("🌿", fontSize = 80.sp)
                         }
-                        // Badges
                         Row(
                             modifier = Modifier.align(Alignment.TopStart).padding(12.dp),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -330,14 +323,13 @@ fun ProductDetailsScreen(
                         }
                     }
 
-                    // ── Thông tin chính ────────────────────────────────────────
+                    // ── Thông tin chính ─────────────────────────────────────────
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(Color.White)
                             .padding(horizontal = 20.dp, vertical = 16.dp)
                     ) {
-                        // Thương hiệu + danh mục
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -354,8 +346,6 @@ fun ProductDetailsScreen(
                             }
                         }
                         Spacer(Modifier.height(10.dp))
-
-                        // Tên sản phẩm
                         Text(
                             p.name,
                             color      = Color(0xFF1A4A40),
@@ -364,8 +354,6 @@ fun ProductDetailsScreen(
                             lineHeight = 28.sp
                         )
                         Spacer(Modifier.height(12.dp))
-
-                        // Stock info
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier.size(8.dp).clip(CircleShape)
@@ -415,7 +403,12 @@ fun ProductDetailsScreen(
 
                     Spacer(Modifier.height(8.dp))
 
-                    // ── Sản phẩm liên quan (cùng thương hiệu) ─────────────────
+                    // ── ĐÁnh giá sản phẩm ← MỚI ──────────────────────────────
+                    ProductReviewSection(productId = p.id)
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // ── Sản phẩm liên quan ─────────────────────────────────────
                     if (relatedProducts.isNotEmpty()) {
                         Column(
                             modifier = Modifier
@@ -441,7 +434,7 @@ fun ProductDetailsScreen(
                             }
                             Spacer(Modifier.height(12.dp))
                             LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                contentPadding        = PaddingValues(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 items(relatedProducts, key = { it.id }) { related ->
@@ -461,12 +454,9 @@ fun ProductDetailsScreen(
     }
 }
 
-// ── Related Product Card (ngang, nhỏ) ─────────────────────────────────────────
+// ── Related Product Card ──────────────────────────────────────────────────────
 @Composable
-private fun RelatedProductCard(
-    product : Product,
-    onClick : () -> Unit
-) {
+private fun RelatedProductCard(product: Product, onClick: () -> Unit) {
     val isOutOfStock = product.stock == 0
     Card(
         modifier  = Modifier.width(140.dp).clickable { onClick() },
@@ -491,37 +481,32 @@ private fun RelatedProductCard(
                     )
                 } else { Text("🌿", fontSize = 36.sp) }
                 if (isOutOfStock) {
-                    Box(
-                        modifier = Modifier.align(Alignment.TopStart)
-                            .clip(RoundedCornerShape(bottomEnd = 6.dp))
-                            .background(Color(0xFFE0E0E0))
-                            .padding(horizontal = 4.dp, vertical = 2.dp)
-                    ) { Text("Hết hàng", color = Color(0xFF9E9E9E), fontSize = 8.sp) }
+                    Box(modifier = Modifier.align(Alignment.TopStart)
+                        .clip(RoundedCornerShape(bottomEnd = 6.dp))
+                        .background(Color(0xFFE0E0E0))
+                        .padding(horizontal = 4.dp, vertical = 2.dp)) {
+                        Text("Hết hàng", color = Color(0xFF9E9E9E), fontSize = 8.sp)
+                    }
                 }
             }
             Column(modifier = Modifier.padding(8.dp)) {
                 Text(
                     product.name,
                     color      = if (isOutOfStock) Color(0xFFAAAAAA) else Color(0xFF1A4A40),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize   = 12.sp,
-                    maxLines   = 2,
-                    overflow   = TextOverflow.Ellipsis,
-                    lineHeight = 16.sp
+                    fontWeight = FontWeight.SemiBold, fontSize = 12.sp,
+                    maxLines   = 2, overflow = TextOverflow.Ellipsis, lineHeight = 16.sp
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
                     "${"%,.0f".format(product.price)}đ",
                     color      = if (isOutOfStock) Color(0xFFAAAAAA) else MintGreen,
-                    fontWeight = FontWeight.Bold,
-                    fontSize   = 12.sp
+                    fontWeight = FontWeight.Bold, fontSize = 12.sp
                 )
             }
         }
     }
 }
 
-// ── Add to cart (dùng lại) ────────────────────────────────────────────────────
 private fun addToCart(db: FirebaseFirestore, auth: FirebaseAuth, product: Product) {
     val uid     = auth.currentUser?.uid ?: return
     val cartRef = db.collection("carts").document(uid).collection("items").document(product.id)

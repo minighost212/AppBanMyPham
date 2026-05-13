@@ -31,13 +31,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.example.appbanmypham.model.Product          // ← import từ model package
+import com.example.appbanmypham.model.Product
 import com.example.appbanmypham.ui.auth.LoginActivity
 import com.example.appbanmypham.ui.cart.CartActivity
+import com.example.appbanmypham.ui.order.OrderScreen          // ← import OrderScreen
 import com.example.appbanmypham.ui.theme.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.ListenerRegistration  // ← cần import thêm
+import com.google.firebase.firestore.ListenerRegistration
 
 class ProductActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -61,10 +62,8 @@ class ProductActivity : ComponentActivity() {
     }
 }
 
-// ── Bottom Nav Tab ─────────────────────────────────────────────────────────────
 enum class BottomTab { HOME, ORDERS, ACCOUNT }
 
-// ── Screen ────────────────────────────────────────────────────────────────────
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProductScreen(
@@ -78,7 +77,6 @@ fun ProductScreen(
     var currentUser by remember { mutableStateOf(auth.currentUser) }
     var userRole    by remember { mutableStateOf<String?>(null) }
 
-    // ── Lắng nghe Auth state ──────────────────────────────────────────────────
     DisposableEffect(Unit) {
         val listener = FirebaseAuth.AuthStateListener { fa ->
             currentUser = fa.currentUser
@@ -88,7 +86,6 @@ fun ProductScreen(
         onDispose { auth.removeAuthStateListener(listener) }
     }
 
-    // ── Lấy role của user ─────────────────────────────────────────────────────
     LaunchedEffect(currentUser?.uid) {
         val uid = currentUser?.uid ?: run { userRole = null; return@LaunchedEffect }
         db.collection("users").document(uid).get()
@@ -116,21 +113,14 @@ fun ProductScreen(
     var showAccountDialog by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
 
-    // ── FIX CHÍNH: Dùng DisposableEffect để remove listener khi Composable bị dispose ──
-    // Listener sản phẩm KHÔNG phụ thuộc vào auth — ai cũng đọc được
-    // (Firestore Rules phải cho phép: allow read: if true trên collection products)
     DisposableEffect(Unit) {
         var registration: ListenerRegistration? = null
-
         registration = db.collection("products")
             .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .addSnapshotListener { snap, error ->
-                // Nếu lỗi (ví dụ mất mạng) thì giữ nguyên list cũ, không xóa
                 if (error != null) return@addSnapshotListener
-
                 val now  = System.currentTimeMillis()
                 val list = snap?.documents?.mapNotNull { doc ->
-                    // mapNotNull để bỏ qua document lỗi thay vì crash
                     runCatching {
                         Product(
                             id          = doc.id,
@@ -146,32 +136,24 @@ fun ProductScreen(
                         )
                     }.getOrNull()
                 } ?: emptyList()
-
                 products   = list
                 categories = listOf("Tất cả") +
                         list.map { it.category }.filter { it.isNotEmpty() }.distinct()
                 isLoading  = false
             }
-
-        onDispose {
-            registration?.remove() // ← Quan trọng: remove listener khi rời màn hình
-        }
+        onDispose { registration?.remove() }
     }
 
-    // ── Lắng nghe giỏ hàng — chỉ khi đã đăng nhập ───────────────────────────
     DisposableEffect(currentUser?.uid) {
         val uid = currentUser?.uid ?: run {
             cartCount = 0
             return@DisposableEffect onDispose {}
         }
-
         val registration = db.collection("carts").document(uid).collection("items")
             .addSnapshotListener { snap, _ -> cartCount = snap?.size() ?: 0 }
-
         onDispose { registration.remove() }
     }
 
-    // ── Filter sản phẩm ───────────────────────────────────────────────────────
     val filtered = products.filter { p ->
         val matchCat    = selectedCat == "Tất cả" || p.category == selectedCat
         val matchSearch = searchQuery.isBlank() ||
@@ -180,7 +162,7 @@ fun ProductScreen(
         matchCat && matchSearch
     }
 
-    // ── Account Info Dialog ───────────────────────────────────────────────────
+    // ── Account Dialog ────────────────────────────────────────────────────────
     if (showAccountDialog && isLoggedIn) {
         AlertDialog(
             onDismissRequest = { showAccountDialog = false },
@@ -243,7 +225,6 @@ fun ProductScreen(
                         showLogoutConfirm = false
                         auth.signOut()
                         selectedTab = BottomTab.HOME
-                        // Sản phẩm vẫn hiển thị vì listener không phụ thuộc auth
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE57373))
                 ) { Text("Đăng xuất", color = Color.White) }
@@ -260,147 +241,149 @@ fun ProductScreen(
     Scaffold(
         containerColor = BackgroundPrimary,
         topBar = {
-            Column {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(brush = AppGradients.mintHorizontal)
-                        .statusBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                ) {
-                    if (!showSearch) {
-                        Row(
-                            modifier = Modifier.align(Alignment.CenterStart),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(32.dp)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color.White.copy(alpha = 0.3f)),
-                                contentAlignment = Alignment.Center
-                            ) { Text("🌿", fontSize = 16.sp) }
-                            Spacer(Modifier.width(8.dp))
-                            Column {
-                                Text(
-                                    "LUMIÈRE",
-                                    color         = Color.White,
-                                    fontSize      = 14.sp,
-                                    fontWeight    = FontWeight.Bold,
-                                    letterSpacing = 1.5.sp
-                                )
-                                Text(
-                                    "Beauty Store",
-                                    color     = Color.White.copy(0.75f),
-                                    fontSize  = 9.sp,
-                                    fontStyle = FontStyle.Italic
-                                )
-                            }
-                        }
-                    } else {
-                        OutlinedTextField(
-                            value         = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier      = Modifier
-                                .fillMaxWidth()
-                                .padding(end = 50.dp),
-                            placeholder   = { Text("Tìm kiếm...", color = Color.White.copy(0.7f)) },
-                            singleLine    = true,
-                            colors        = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor   = Color.White,
-                                unfocusedBorderColor = Color.White.copy(0.5f),
-                                focusedTextColor     = Color.White,
-                                unfocusedTextColor   = Color.White,
-                                cursorColor          = Color.White
-                            ),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                    }
-
-                    Row(
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+            // ── TopBar chỉ hiện khi ở tab HOME (Orders & Account tự quản lý header) ──
+            if (selectedTab == BottomTab.HOME) {
+                Column {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(brush = AppGradients.mintHorizontal)
+                            .statusBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
                     ) {
-                        IconButton(onClick = {
-                            showSearch = !showSearch
-                            if (!showSearch) searchQuery = ""
-                        }) {
-                            Icon(
-                                if (showSearch) Icons.Default.Close else Icons.Default.Search,
-                                contentDescription = null, tint = Color.White
-                            )
-                        }
-
-                        Box {
-                            IconButton(onClick = {
-                                if (isLoggedIn) onGoCart() else onGoLogin()
-                            }) {
-                                Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.White)
-                            }
-                            if (isLoggedIn && cartCount > 0) {
+                        if (!showSearch) {
+                            Row(
+                                modifier          = Modifier.align(Alignment.CenterStart),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
                                 Box(
                                     modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .offset(x = (-2).dp, y = 4.dp)
-                                        .size(18.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(0xFFFF6B6B)),
+                                        .size(32.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(Color.White.copy(alpha = 0.3f)),
                                     contentAlignment = Alignment.Center
-                                ) {
+                                ) { Text("🌿", fontSize = 16.sp) }
+                                Spacer(Modifier.width(8.dp))
+                                Column {
                                     Text(
-                                        if (cartCount > 9) "9+" else cartCount.toString(),
-                                        color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold
+                                        "LUMIÈRE",
+                                        color         = Color.White,
+                                        fontSize      = 14.sp,
+                                        fontWeight    = FontWeight.Bold,
+                                        letterSpacing = 1.5.sp
+                                    )
+                                    Text(
+                                        "Beauty Store",
+                                        color     = Color.White.copy(0.75f),
+                                        fontSize  = 9.sp,
+                                        fontStyle = FontStyle.Italic
                                     )
                                 }
                             }
+                        } else {
+                            OutlinedTextField(
+                                value         = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier      = Modifier
+                                    .fillMaxWidth()
+                                    .padding(end = 50.dp),
+                                placeholder   = { Text("Tìm kiếm...", color = Color.White.copy(0.7f)) },
+                                singleLine    = true,
+                                colors        = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor   = Color.White,
+                                    unfocusedBorderColor = Color.White.copy(0.5f),
+                                    focusedTextColor     = Color.White,
+                                    unfocusedTextColor   = Color.White,
+                                    cursorColor          = Color.White
+                                ),
+                                shape = RoundedCornerShape(12.dp)
+                            )
                         }
 
-                        if (isLoggedIn) {
-                            IconButton(onClick = { showAccountDialog = true }) {
-                                Icon(Icons.Default.AccountCircle, contentDescription = "Tài khoản", tint = Color.White)
+                        Row(
+                            modifier              = Modifier.align(Alignment.CenterEnd),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            IconButton(onClick = {
+                                showSearch = !showSearch
+                                if (!showSearch) searchQuery = ""
+                            }) {
+                                Icon(
+                                    if (showSearch) Icons.Default.Close else Icons.Default.Search,
+                                    contentDescription = null, tint = Color.White
+                                )
                             }
-                        } else {
-                            IconButton(onClick = onGoLogin) {
-                                Icon(Icons.Default.Login, contentDescription = "Đăng nhập", tint = Color.White)
+                            Box {
+                                IconButton(onClick = {
+                                    if (isLoggedIn) onGoCart() else onGoLogin()
+                                }) {
+                                    Icon(Icons.Default.ShoppingCart, contentDescription = null, tint = Color.White)
+                                }
+                                if (isLoggedIn && cartCount > 0) {
+                                    Box(
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .offset(x = (-2).dp, y = 4.dp)
+                                            .size(18.dp)
+                                            .clip(CircleShape)
+                                            .background(Color(0xFFFF6B6B)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            if (cartCount > 9) "9+" else cartCount.toString(),
+                                            color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
+                            if (isLoggedIn) {
+                                IconButton(onClick = { showAccountDialog = true }) {
+                                    Icon(Icons.Default.AccountCircle, contentDescription = "Tài khoản", tint = Color.White)
+                                }
+                            } else {
+                                IconButton(onClick = onGoLogin) {
+                                    Icon(Icons.Default.Login, contentDescription = "Đăng nhập", tint = Color.White)
+                                }
                             }
                         }
                     }
-                }
 
-                if (selectedTab == BottomTab.HOME && categories.size > 1) {
-                    LazyRow(
-                        modifier = Modifier
-                            .background(Color.White)
-                            .padding(vertical = 10.dp),
-                        contentPadding        = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(categories) { cat ->
-                            val isSelected = cat == selectedCat
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(20.dp))
-                                    .background(
-                                        brush = if (isSelected) AppGradients.mintHorizontal
-                                        else androidx.compose.ui.graphics.Brush.horizontalGradient(
-                                            listOf(Color(0xFFEAF9F5), Color(0xFFEAF9F5))
+                    if (categories.size > 1) {
+                        LazyRow(
+                            modifier              = Modifier
+                                .background(Color.White)
+                                .padding(vertical = 10.dp),
+                            contentPadding        = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(categories) { cat ->
+                                val isSelected = cat == selectedCat
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(20.dp))
+                                        .background(
+                                            brush = if (isSelected) AppGradients.mintHorizontal
+                                            else androidx.compose.ui.graphics.Brush.horizontalGradient(
+                                                listOf(Color(0xFFEAF9F5), Color(0xFFEAF9F5))
+                                            )
                                         )
+                                        .clickable { selectedCat = cat }
+                                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        cat,
+                                        color      = if (isSelected) Color.White else MintGreen,
+                                        fontSize   = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                     )
-                                    .clickable { selectedCat = cat }
-                                    .padding(horizontal = 16.dp, vertical = 8.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    cat,
-                                    color      = if (isSelected) Color.White else MintGreen,
-                                    fontSize   = 12.sp,
-                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                                )
+                                }
                             }
                         }
                     }
                 }
             }
+            // Orders & Account tab tự quản lý header của mình → không render gì ở đây
         },
         bottomBar = {
             NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
@@ -426,7 +409,7 @@ fun ProductScreen(
         }
     ) { padding ->
         when (selectedTab) {
-            BottomTab.HOME    -> HomeTabContent(
+            BottomTab.HOME -> HomeTabContent(
                 padding      = padding,
                 isLoading    = isLoading,
                 filtered     = filtered,
@@ -438,7 +421,14 @@ fun ProductScreen(
                 onGoLogin    = onGoLogin,
                 onGoDetail   = onGoDetail
             )
-            BottomTab.ORDERS  -> OrdersTabContent(padding = padding)
+
+
+            BottomTab.ORDERS -> Box(modifier = Modifier.padding(padding)) {
+                OrderScreen(
+                    onBack = { selectedTab = BottomTab.HOME }  // nút back → về Home
+                )
+            }
+
             BottomTab.ACCOUNT -> AccountTabContent(
                 padding  = padding,
                 auth     = auth,
@@ -563,20 +553,6 @@ private fun HomeTabContent(
     }
 }
 
-// ── ORDERS Tab ────────────────────────────────────────────────────────────────
-@Composable
-private fun OrdersTabContent(padding: PaddingValues) {
-    Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("🛍️", fontSize = 56.sp)
-            Spacer(Modifier.height(12.dp))
-            Text("Đơn hàng của bạn", color = Color(0xFF1A4A40), fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(6.dp))
-            Text("Chức năng đang được phát triển", color = Color(0xFF8ACABA), fontSize = 13.sp)
-        }
-    }
-}
-
 // ── ACCOUNT Tab ───────────────────────────────────────────────────────────────
 @Composable
 private fun AccountTabContent(
@@ -640,12 +616,14 @@ private fun AccountTabContent(
             ) {
                 Text(
                     "Thông tin tài khoản",
-                    color = MintGreen, fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp
+                    color      = MintGreen,
+                    fontSize   = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 0.5.sp
                 )
-                AccountInfoRow("Họ và tên",   user?.displayName                   ?: "Chưa cập nhật")
+                AccountInfoRow("Họ và tên",   user?.displayName                  ?: "Chưa cập nhật")
                 HorizontalDivider(color = Color(0xFFEAF9F5), thickness = 0.5.dp)
-                AccountInfoRow("Email",        user?.email                        ?: "Chưa cập nhật")
+                AccountInfoRow("Email",        user?.email                       ?: "Chưa cập nhật")
                 HorizontalDivider(color = Color(0xFFEAF9F5), thickness = 0.5.dp)
                 AccountInfoRow("ID tài khoản", user?.uid?.take(14)?.plus("...") ?: "-")
             }
@@ -681,7 +659,7 @@ private fun ProductGridCard(
     onAddToCart : (Product) -> Unit,
     onCardClick : () -> Unit
 ) {
-    val isNew = remember(product.createdAt) {
+    val isNew        = remember(product.createdAt) {
         (System.currentTimeMillis() - product.createdAt) < 7 * 24 * 60 * 60 * 1000L
     }
     val isOutOfStock = product.stock == 0
@@ -702,11 +680,11 @@ private fun ProductGridCard(
             ) {
                 if (product.imageUrl.isNotEmpty()) {
                     AsyncImage(
-                        model        = product.imageUrl,
+                        model              = product.imageUrl,
                         contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier     = Modifier.fillMaxSize(),
-                        alpha        = if (isOutOfStock) 0.5f else 1f
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize(),
+                        alpha              = if (isOutOfStock) 0.5f else 1f
                     )
                 } else { Text("🌿", fontSize = 40.sp) }
 
@@ -773,10 +751,10 @@ private fun ProductGridCard(
                                 .background(brush = AppGradients.mintHorizontal)
                         ) {
                             Icon(
-                                if (isLoggedIn) Icons.Default.Add else Icons.Default.Login,
+                                if (isLoggedIn) Icons.Default.ShoppingCart else Icons.Default.Login,
                                 contentDescription = null,
-                                tint     = Color.White,
-                                modifier = Modifier.size(16.dp)
+                                tint               = Color.White,
+                                modifier           = Modifier.size(16.dp)
                             )
                         }
                     }
@@ -794,7 +772,7 @@ private fun ProductListCard(
     onAddToCart : (Product) -> Unit,
     onCardClick : () -> Unit
 ) {
-    val isNew = remember(product.createdAt) {
+    val isNew        = remember(product.createdAt) {
         (System.currentTimeMillis() - product.createdAt) < 7 * 24 * 60 * 60 * 1000L
     }
     val isOutOfStock = product.stock == 0
@@ -815,11 +793,11 @@ private fun ProductListCard(
             ) {
                 if (product.imageUrl.isNotEmpty()) {
                     AsyncImage(
-                        model        = product.imageUrl,
+                        model              = product.imageUrl,
                         contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier     = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
-                        alpha        = if (isOutOfStock) 0.5f else 1f
+                        contentScale       = ContentScale.Crop,
+                        modifier           = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                        alpha              = if (isOutOfStock) 0.5f else 1f
                     )
                 } else { Text("🌿", fontSize = 32.sp) }
 
@@ -881,8 +859,8 @@ private fun ProductListCard(
                     Icon(
                         if (isLoggedIn) Icons.Default.ShoppingCartCheckout else Icons.Default.Login,
                         contentDescription = null,
-                        tint     = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        tint               = Color.White,
+                        modifier           = Modifier.size(20.dp)
                     )
                 }
             }
